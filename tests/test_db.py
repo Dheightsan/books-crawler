@@ -37,6 +37,12 @@ def test_second_run_updates_instead_of_duplicating(conn):
     assert row == ("New", 999, "2026-11-02T00:00:00")
 
 
+def test_repeated_upc_in_one_batch_keeps_the_first(conn):
+    n = db.save_books(conn, [book("a", title="First"), book("a", title="Second")])
+    assert n == 1
+    assert conn.execute("SELECT title FROM books WHERE upc = 'a'").fetchone()[0] == "First"
+
+
 def test_rating_check_rejects_out_of_range(conn):
     with pytest.raises(sqlite3.IntegrityError):
         db.save_books(conn, [book("a", rating=6)])

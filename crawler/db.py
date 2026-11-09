@@ -59,15 +59,18 @@ def connect(path: str) -> sqlite3.Connection:
 def save_books(
     conn: sqlite3.Connection, books: Iterable[Book], crawled_at: str | None = None
 ) -> int:
-    """Upsert books by UPC in one transaction. Returns the number of books written."""
+    """Upsert books by UPC in one transaction. Returns the number of distinct UPCs written."""
     stamp = crawled_at or datetime.now(UTC).isoformat(timespec="seconds")
+    first = {}  # same rule as the CSV: if a UPC repeats, the first one wins
+    for b in books:
+        first.setdefault(b.upc, b)
     rows = [
         (
             b.upc, b.title, round(b.price * 100), b.currency, b.stock,
             b.rating or None,  # the parser uses 0 for "no stars found"; store NULL
             b.category, b.url, stamp,
         )
-        for b in books
+        for b in first.values()
     ]
     with conn:  # commit on success, roll back everything if one row fails
         conn.executemany(UPSERT, rows)
