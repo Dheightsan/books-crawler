@@ -29,7 +29,7 @@ class Crawler:
         self.pages = 0
         self.sleep = sleep
         self.limiter = HostLimiter(delay, clock=clock, sleep=sleep)
-        self.robots = RobotsCache(_Throttled(client, self.limiter), USER_AGENT)
+        self.robots = RobotsCache(_Throttled(client, self.limiter), USER_AGENT, sleep=sleep)
         self.seen: set[str] = set()
 
     def _get(self, url: str) -> str | None:

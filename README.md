@@ -46,8 +46,11 @@ python -m crawler --start https://books.toscrape.com/catalogue/category/books/tr
 
 ## Politeness
 
-- Reads `robots.txt` once per host and skips disallowed URLs (logged). A 404 means
-  everything is allowed.
+- Reads `robots.txt` once per host and skips disallowed URLs (logged), following
+  RFC 9309. A 2xx response is parsed. Any other 4xx except 429 (404, 403 and so on)
+  means everything is allowed. A 5xx, a 429 or a network error is retried with
+  backoff, and if it still fails the whole host is treated as disallowed for the
+  rest of the run, with a warning.
 - Waits at least `--delay` seconds between requests to the same host, robots.txt
   included.
 - Sends a User-Agent that names the project and where to find it.
