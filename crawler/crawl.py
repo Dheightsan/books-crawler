@@ -18,7 +18,10 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class CrawlStats:
-    """Outcome counters for one run. Every URL that is not downloaded lands in one skip bucket."""
+    """Outcome counters for one run. A URL not downloaded lands in one skip bucket.
+
+    skipped_parse counts pages that were downloaded but could not be parsed.
+    """
 
     downloaded: int = 0
     skipped_robots: int = 0

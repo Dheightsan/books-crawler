@@ -49,8 +49,9 @@ python -m crawler --start https://books.toscrape.com/catalogue/category/books/tr
 - Reads `robots.txt` once per host and skips disallowed URLs (logged), following
   RFC 9309. A 2xx response is parsed. Any other 4xx except 429 (404, 403 and so on)
   means everything is allowed. A 5xx, a 429 or a network error is retried with
-  backoff, and if it still fails the whole host is treated as disallowed for the
-  rest of the run, with a warning.
+  backoff, and if it still fails (or the answer is anything else, such as a redirect
+  that cannot be followed) the whole host is treated as disallowed for the rest of
+  the run, with a warning.
 - Waits at least `--delay` seconds between requests to the same host, robots.txt
   included.
 - Sends a User-Agent that names the project and where to find it.
@@ -59,6 +60,9 @@ python -m crawler --start https://books.toscrape.com/catalogue/category/books/tr
 - A page that still fails after the retries is logged with its URL and the cause,
   counts toward `--max-pages`, and the run goes on with the next URL. A product page
   that cannot be parsed is logged and skipped the same way.
+- At the end of a run it logs one summary line with the pages downloaded, the pages
+  skipped by robots.txt, network error, parse error and HTTP status, and the books
+  written.
 
 ## How it works
 

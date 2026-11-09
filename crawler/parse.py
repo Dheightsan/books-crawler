@@ -34,7 +34,8 @@ def parse_listing(html: str, base_url: str) -> tuple[list[str], str | None]:
         if href:
             products.append(urljoin(base_url, href))
     nxt = tree.css_first("li.next a")
-    next_url = urljoin(base_url, nxt.attributes["href"]) if nxt else None
+    next_href = nxt.attributes.get("href") if nxt else None
+    next_url = urljoin(base_url, next_href) if next_href else None
     return products, next_url
 
 
@@ -43,7 +44,9 @@ def parse_category_links(html: str, base_url: str) -> dict[str, str]:
     tree = HTMLParser(html)
     out = {}
     for a in tree.css("div.side_categories ul ul li a"):
-        out[a.text(strip=True).lower()] = urljoin(base_url, a.attributes["href"])
+        href = a.attributes.get("href")
+        if href:
+            out[a.text(strip=True).lower()] = urljoin(base_url, href)
     return out
 
 

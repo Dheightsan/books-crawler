@@ -18,10 +18,11 @@ def test_robots_503_downloads_nothing_from_host():
         seen.append(req.url.path)
         return httpx.Response(503)
 
-    crawler, books, _ = run(handler)
+    crawler, books, sleeps = run(handler)
     assert books == []
     assert set(seen) == {"/robots.txt"}
     assert crawler.pages == 0
+    assert {2.0, 4.0, 8.0} <= set(sleeps)  # robots.txt retries use the crawler's sleep
 
 
 def test_robots_network_error_downloads_nothing_from_host():

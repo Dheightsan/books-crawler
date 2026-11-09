@@ -39,3 +39,12 @@ def test_unreadable_price_raises_parse_error(product_html):
     broken = product_html.replace("£51.77", "free")
     with pytest.raises(ParseError, match="unreadable price"):
         parse_product(broken, "https://x.test/p")
+
+
+def test_links_without_href_are_ignored():
+    html = (
+        '<li class="next"><a>next</a></li>'
+        '<div class="side_categories"><ul><li><ul><li><a>Travel</a></li></ul></li></ul></div>'
+    )
+    assert parse_listing(html, BASE) == ([], None)
+    assert parse_category_links(html, BASE) == {}
