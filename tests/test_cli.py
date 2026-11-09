@@ -1,4 +1,5 @@
 import csv
+import sqlite3
 
 import httpx
 
@@ -113,3 +114,14 @@ def test_summary_counts_robots_skips(tmp_path, listing_html, product_html, caplo
     assert len(rows) == 0
     assert "skipped 21 by robots.txt" in caplog.text
     assert "1 pages downloaded" in caplog.text
+
+
+def test_db_option_saves_the_same_books(tmp_path, listing_html, product_html):
+    out, dbfile = tmp_path / "books.csv", tmp_path / "books.db"
+    args = ["--start", "https://books.toscrape.com/index.html", "--max-pages", "4",
+            "--out", str(out), "--db", str(dbfile)]
+    for _ in range(2):  # the second run must update, not duplicate
+        main(args, transport=make_transport(listing_html, product_html), sleep=lambda s: None)
+    conn = sqlite3.connect(dbfile)
+    assert conn.execute("SELECT COUNT(*) FROM books").fetchone()[0] == len(read_rows(out))
+    conn.close()

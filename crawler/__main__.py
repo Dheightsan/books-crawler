@@ -7,6 +7,7 @@ import time
 
 import httpx
 
+from . import db
 from .crawl import Crawler
 from .export import write_csv
 from .fetch import make_client
@@ -19,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--delay", type=float, default=1.0, help="seconds between requests per host")
     p.add_argument("--out", default="books.csv", help="CSV output path")
     p.add_argument("--category", help="only crawl this category, e.g. travel")
+    p.add_argument("--db", help="also save the books to this SQLite file (upsert by UPC)")
     return p
 
 
@@ -32,15 +34,25 @@ def main(
     client = make_client(transport)
     crawler = Crawler(client, delay=args.delay, max_pages=args.max_pages, sleep=sleep)
 
+    collected = []
+
     def books():
         for start in args.start:
-            yield from crawler.crawl(start, args.category)
+            for book in crawler.crawl(start, args.category):
+                collected.append(book)
+                yield book
 
     try:
         rows = write_csv(books(), args.out)
     finally:
         client.close()
     logging.info("wrote %d books to %s", rows, args.out)
+    if args.db:
+        conn = db.connect(args.db)
+        try:
+            logging.info("saved %d books to %s", db.save_books(conn, collected), args.db)
+        finally:
+            conn.close()
     logging.info("run summary: %s", crawler.stats.summary(rows))
     return 0
 
