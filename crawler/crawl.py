@@ -3,6 +3,7 @@
 import logging
 import time
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 
 import httpx
 
@@ -13,6 +14,26 @@ from .ratelimit import HostLimiter
 from .robots import RobotsCache
 
 log = logging.getLogger(__name__)
+
+
+@dataclass
+class CrawlStats:
+    """Outcome counters for one run. Every URL that is not downloaded lands in one skip bucket."""
+
+    downloaded: int = 0
+    skipped_robots: int = 0
+    skipped_network: int = 0
+    skipped_parse: int = 0
+    skipped_http: int = 0  # answered, but not with 200
+
+    def summary(self, books_written: int) -> str:
+        return (
+            f"{self.downloaded} pages downloaded, "
+            f"skipped {self.skipped_robots} by robots.txt, "
+            f"{self.skipped_network} by network error, "
+            f"{self.skipped_parse} by parse error, {self.skipped_http} by HTTP status; "
+            f"{books_written} books written"
+        )
 
 
 class Crawler:
@@ -31,12 +52,14 @@ class Crawler:
         self.limiter = HostLimiter(delay, clock=clock, sleep=sleep)
         self.robots = RobotsCache(_Throttled(client, self.limiter), USER_AGENT, sleep=sleep)
         self.seen: set[str] = set()
+        self.stats = CrawlStats()
 
     def _get(self, url: str) -> str | None:
         """Fetch one page if robots.txt, the budget and the status allow it."""
         if url in self.seen or self.pages >= self.max_pages:
             return None
         if not self.robots.allowed(url):
+            self.stats.skipped_robots += 1
             return None
         self.seen.add(url)
         self.limiter.wait(url)
@@ -44,6 +67,7 @@ class Crawler:
             resp = get_with_retries(self.client, url, sleep=self.sleep)
         except httpx.RequestError as exc:
             self.pages += 1
+            self.stats.skipped_network += 1
             log.warning(
                 "%s: network error after retries (%s: %s), skipped",
                 url, type(exc).__name__, exc,
@@ -51,8 +75,10 @@ class Crawler:
             return None
         self.pages += 1
         if resp.status_code != 200:
+            self.stats.skipped_http += 1
             log.warning("%s: HTTP %s, skipped", url, resp.status_code)
             return None
+        self.stats.downloaded += 1
         log.info("[%d/%d] %s", self.pages, self.max_pages, url)
         return resp.content.decode("utf-8", errors="replace")
 
@@ -84,6 +110,7 @@ class Crawler:
                 try:
                     book = parse_product(page, product_url)
                 except ParseError as exc:
+                    self.stats.skipped_parse += 1
                     log.warning("%s: could not parse product page (%s), skipped", product_url, exc)
                     continue
                 yield book

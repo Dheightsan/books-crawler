@@ -40,7 +40,8 @@ def main(
         rows = write_csv(books(), args.out)
     finally:
         client.close()
-    logging.info("wrote %d books to %s (%d pages fetched)", rows, args.out, crawler.pages)
+    logging.info("wrote %d books to %s", rows, args.out)
+    logging.info("run summary: %s", crawler.stats.summary(rows))
     return 0
 
 

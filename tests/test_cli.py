@@ -69,10 +69,14 @@ def test_malformed_product_is_skipped_and_others_written(
         return httpx.Response(200, content=b"<html><body>no book here</body></html>")
 
     transport = make_transport(listing_html, product_html, {FIRST_PRODUCT: broken})
-    with caplog.at_level("WARNING"):
+    with caplog.at_level("INFO"):
         code, rows = run_cli(tmp_path, transport)
     assert code == 0
     assert len(rows) == 2  # 3 products requested, the first one is malformed
+    assert "run summary: 4 pages downloaded, skipped 0 by robots.txt, 0 by network error, " in (
+        caplog.text
+    )
+    assert "1 by parse error" in caplog.text
     assert f"https://books.toscrape.com{FIRST_PRODUCT}" in caplog.text
     assert "could not parse product page" in caplog.text
 
@@ -84,9 +88,28 @@ def test_network_error_on_product_is_skipped_and_run_continues(
         raise httpx.ReadTimeout("timed out", request=req)
 
     transport = make_transport(listing_html, product_html, {FIRST_PRODUCT: boom})
-    with caplog.at_level("WARNING"):
+    with caplog.at_level("INFO"):
         code, rows = run_cli(tmp_path, transport)
     assert code == 0
     assert len(rows) == 2
+    assert "1 by network error" in caplog.text
+    assert "2 books written" in caplog.text
     assert "network error after retries" in caplog.text
     assert f"https://books.toscrape.com{FIRST_PRODUCT}" in caplog.text
+
+
+ROBOTS_BLOCK = "User-agent: *\nDisallow: /catalogue/\n"
+
+
+def test_summary_counts_robots_skips(tmp_path, listing_html, product_html, caplog):
+    transport = make_transport(
+        listing_html,
+        product_html,
+        {"/robots.txt": lambda req: httpx.Response(200, text=ROBOTS_BLOCK)},
+    )
+    with caplog.at_level("INFO"):
+        code, rows = run_cli(tmp_path, transport)
+    assert code == 0
+    assert len(rows) == 0
+    assert "skipped 21 by robots.txt" in caplog.text
+    assert "1 pages downloaded" in caplog.text
