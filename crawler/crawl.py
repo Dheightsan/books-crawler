@@ -8,7 +8,7 @@ import httpx
 
 from . import USER_AGENT
 from .fetch import get_with_retries
-from .parse import Book, parse_category_links, parse_listing, parse_product
+from .parse import Book, ParseError, parse_category_links, parse_listing, parse_product
 from .ratelimit import HostLimiter
 from .robots import RobotsCache
 
@@ -40,7 +40,15 @@ class Crawler:
             return None
         self.seen.add(url)
         self.limiter.wait(url)
-        resp = get_with_retries(self.client, url, sleep=self.sleep)
+        try:
+            resp = get_with_retries(self.client, url, sleep=self.sleep)
+        except httpx.RequestError as exc:
+            self.pages += 1
+            log.warning(
+                "%s: network error after retries (%s: %s), skipped",
+                url, type(exc).__name__, exc,
+            )
+            return None
         self.pages += 1
         if resp.status_code != 200:
             log.warning("%s: HTTP %s, skipped", url, resp.status_code)
@@ -73,7 +81,12 @@ class Crawler:
                     if self.pages >= self.max_pages:
                         return
                     continue
-                yield parse_product(page, product_url)
+                try:
+                    book = parse_product(page, product_url)
+                except ParseError as exc:
+                    log.warning("%s: could not parse product page (%s), skipped", product_url, exc)
+                    continue
+                yield book
 
 
 class _Throttled:

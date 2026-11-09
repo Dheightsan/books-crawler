@@ -1,4 +1,6 @@
-from crawler.parse import parse_category_links, parse_listing, parse_product
+import pytest
+
+from crawler.parse import ParseError, parse_category_links, parse_listing, parse_product
 
 BASE = "https://books.toscrape.com/index.html"
 
@@ -26,3 +28,14 @@ def test_product_fields(product_html):
     assert book.upc == "a897fe39b1053632"
     assert book.category == "Poetry"
     assert book.url == url
+
+
+def test_missing_title_raises_parse_error():
+    with pytest.raises(ParseError, match="missing element"):
+        parse_product("<html><body></body></html>", "https://x.test/p")
+
+
+def test_unreadable_price_raises_parse_error(product_html):
+    broken = product_html.replace("£51.77", "free")
+    with pytest.raises(ParseError, match="unreadable price"):
+        parse_product(broken, "https://x.test/p")

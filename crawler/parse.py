@@ -9,6 +9,10 @@ RATINGS = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 CURRENCIES = {"£": "GBP", "$": "USD", "€": "EUR"}
 
 
+class ParseError(ValueError):
+    """A product page lacks a required element or holds a value that cannot be read."""
+
+
 @dataclass
 class Book:
     title: str
@@ -45,7 +49,17 @@ def parse_category_links(html: str, base_url: str) -> dict[str, str]:
 
 def _parse_price(text: str) -> tuple[float, str]:
     text = text.strip()
-    return float(text[1:]), CURRENCIES.get(text[0], text[0])
+    try:
+        return float(text[1:]), CURRENCIES.get(text[0], text[0])
+    except (ValueError, IndexError) as exc:
+        raise ParseError(f"unreadable price {text!r}") from exc
+
+
+def _required(tree: HTMLParser, selector: str):
+    node = tree.css_first(selector)
+    if node is None:
+        raise ParseError(f"missing element {selector!r}")
+    return node
 
 
 def _parse_stock(text: str) -> int:
@@ -54,10 +68,11 @@ def _parse_stock(text: str) -> int:
 
 
 def parse_product(html: str, url: str) -> Book:
+    """Parse a product page. Raises ParseError when title, price or stock is unusable."""
     tree = HTMLParser(html)
-    title = tree.css_first("div.product_main h1").text(strip=True)
-    price, currency = _parse_price(tree.css_first("div.product_main p.price_color").text())
-    stock = _parse_stock(tree.css_first("div.product_main p.availability").text())
+    title = _required(tree, "div.product_main h1").text(strip=True)
+    price, currency = _parse_price(_required(tree, "div.product_main p.price_color").text())
+    stock = _parse_stock(_required(tree, "div.product_main p.availability").text())
 
     rating = 0
     star = tree.css_first("div.product_main p.star-rating")

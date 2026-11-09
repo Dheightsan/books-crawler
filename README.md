@@ -54,8 +54,11 @@ python -m crawler --start https://books.toscrape.com/catalogue/category/books/tr
 - Waits at least `--delay` seconds between requests to the same host, robots.txt
   included.
 - Sends a User-Agent that names the project and where to find it.
-- Retries 429 and 5xx responses with exponential backoff, and honors `Retry-After`.
-  Gives up after 4 retries.
+- Retries 429, 5xx and network errors with exponential backoff, and honors
+  `Retry-After`. Gives up after 4 retries.
+- A page that still fails after the retries is logged with its URL and the cause,
+  counts toward `--max-pages`, and the run goes on with the next URL. A product page
+  that cannot be parsed is logged and skipped the same way.
 
 ## How it works
 

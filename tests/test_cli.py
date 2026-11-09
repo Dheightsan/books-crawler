@@ -4,10 +4,17 @@ import httpx
 
 from crawler.__main__ import main
 
+FIRST_PRODUCT = "/catalogue/a-light-in-the-attic_1000/index.html"
 
-def make_transport(listing_html, product_html):
+
+def make_transport(listing_html, product_html, overrides=None):
+    """overrides maps a path to a callable(request) returning a response or raising."""
+    overrides = overrides or {}
+
     def handler(req):
         path = req.url.path
+        if path in overrides:
+            return overrides[path](req)
         if path == "/robots.txt":
             return httpx.Response(404)
         if path == "/index.html":
@@ -37,3 +44,49 @@ def test_short_run(tmp_path, listing_html, product_html):
     assert rows[0]["currency"] == "GBP"
     assert rows[0]["rating"] == "3"
     assert sleeps  # the host pause was applied
+
+
+def read_rows(path):
+    with open(path, newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
+
+
+def run_cli(tmp_path, transport, max_pages=4):
+    out = tmp_path / "books.csv"
+    code = main(
+        ["--start", "https://books.toscrape.com/index.html", "--max-pages", str(max_pages),
+         "--delay", "1.0", "--out", str(out)],
+        transport=transport,
+        sleep=lambda seconds: None,
+    )
+    return code, read_rows(out)
+
+
+def test_malformed_product_is_skipped_and_others_written(
+    tmp_path, listing_html, product_html, caplog
+):
+    def broken(req):
+        return httpx.Response(200, content=b"<html><body>no book here</body></html>")
+
+    transport = make_transport(listing_html, product_html, {FIRST_PRODUCT: broken})
+    with caplog.at_level("WARNING"):
+        code, rows = run_cli(tmp_path, transport)
+    assert code == 0
+    assert len(rows) == 2  # 3 products requested, the first one is malformed
+    assert f"https://books.toscrape.com{FIRST_PRODUCT}" in caplog.text
+    assert "could not parse product page" in caplog.text
+
+
+def test_network_error_on_product_is_skipped_and_run_continues(
+    tmp_path, listing_html, product_html, caplog
+):
+    def boom(req):
+        raise httpx.ReadTimeout("timed out", request=req)
+
+    transport = make_transport(listing_html, product_html, {FIRST_PRODUCT: boom})
+    with caplog.at_level("WARNING"):
+        code, rows = run_cli(tmp_path, transport)
+    assert code == 0
+    assert len(rows) == 2
+    assert "network error after retries" in caplog.text
+    assert f"https://books.toscrape.com{FIRST_PRODUCT}" in caplog.text
