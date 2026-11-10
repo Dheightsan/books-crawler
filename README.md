@@ -32,6 +32,21 @@ books of the front page, 25 pages fetched, 23 unique books):
 python -m crawler --start https://books.toscrape.com/catalogue/category/books/travel_2/index.html --start https://books.toscrape.com/index.html --max-pages 25 --delay 1.0 --out examples/sample.csv
 ```
 
+## Docker
+
+The image has only the runtime dependencies and runs as a non-root user. It works
+in `/data`, so mount the folder where you want the files:
+
+```
+docker build -t books-crawler .
+docker run --rm -v "$PWD:/data" --user "$(id -u):$(id -g)" books-crawler --start https://books.toscrape.com/ --max-pages 25 --out books.csv --db books.db
+docker run --rm -v "$PWD:/data" --user "$(id -u):$(id -g)" --entrypoint python books-crawler -m crawler.report --db books.db
+```
+
+`--user` keeps the output files owned by you on Linux; Docker Desktop doesn't
+need it. CI builds the image on every push and runs the reports inside it on
+`examples/sample.csv`, with no network.
+
 ## CSV columns
 
 | column | meaning |

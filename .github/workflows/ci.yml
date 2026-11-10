@@ -11,3 +11,14 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: pytest -q
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t books-crawler .
+      - run: docker run --rm books-crawler --help
+      - name: Load the sample CSV into SQLite and run the reports inside the image
+        run: >
+          docker run --rm -v "$PWD/examples:/samples:ro"
+          --entrypoint python books-crawler
+          -m crawler.report --db /tmp/books.db --load /samples/sample.csv
