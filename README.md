@@ -1,5 +1,9 @@
 # books-crawler
 
+[![CI](https://github.com/Dheightsan/books-crawler/actions/workflows/ci.yml/badge.svg)](https://github.com/Dheightsan/books-crawler/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+
 A small, polite crawler for [books.toscrape.com](https://books.toscrape.com/), a
 practice site built for scraping. It walks listing pages, opens each book page and
 writes the result to a CSV file.
